@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VEXETAU DBMS - Hệ Thống Đặt Vé & Quản Trị Vận Tải Đa Phương Tiện</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <link rel="stylesheet" href="/assets/css/style.css" />
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-lg border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-extrabold text-xl shadow">
+                    <i class="fa-solid fa-train-subway"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-extrabold text-lg tracking-tight">VEXETAU</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono-code">MySQL 8.0 ACID</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Hệ thống Đặt vé Xe Khách & Đường Sắt Chuyên Sâu DBMS</p>
+                </div>
+            </div>
+
+            <!-- 3 PHÂN HỆ CHÍNH -->
+            <nav class="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700">
+                <button onclick="switchRoleTab('customer')" id="tab-customer" class="role-tab px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white transition">
+                    <i class="fa-solid fa-ticket mr-1.5"></i>1. Khách Hàng
+                </button>
+                <button onclick="switchRoleTab('operator')" id="tab-operator" class="role-tab px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white transition">
+                    <i class="fa-solid fa-bus mr-1.5"></i>2. Nhà Xe / Đường Sắt
+                </button>
+                <button onclick="switchRoleTab('admin')" id="tab-admin" class="role-tab px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 hover:text-white transition">
+                    <i class="fa-solid fa-database mr-1.5"></i>3. Admin & DBMS Monitor
+                </button>
+            </nav>
+
+            <!-- TRẠNG THÁI KẾT NỐI MYSQL -->
+            <div id="db-status-badge" class="text-xs font-mono-code px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-amber-300">
+                <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Đang kiểm tra MySQL...
+            </div>
+        </div>
+    </header>
+
+    <!-- SQL LIVE EXECUTION BAR (HIỂN THỊ CÂU LỆNH STORED PROCEDURE / TRANSACTION ĐANG CHẠY) -->
+    <div class="sql-console px-4 py-2 text-xs font-mono-code">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div class="truncate">
+                <span class="text-emerald-400 font-bold mr-2">[DBMS LIVE SQL]</span>
+                <span id="live-sql-text">READY — Kết nối Connection Pool MySQL thành công.</span>
+            </div>
+            <span class="text-slate-400 shrink-0">Session: <strong id="session-id-label" class="text-white"></strong></span>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+
+        <!-- ===================================================================== -->
+        <!-- PHÂN HỆ 1: KHÁCH HÀNG                                                 -->
+        <!-- ===================================================================== -->
+        <section id="view-customer" class="space-y-6">
+            <!-- Sub-menu Khách hàng -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex gap-2">
+                    <button onclick="switchCustomerSub('search')" id="csub-search" class="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                        <i class="fa-solid fa-magnifying-glass mr-1"></i>Tìm & Đặt Vé
+                    </button>
+                    <button onclick="switchCustomerSub('lookup')" id="csub-lookup" class="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                        <i class="fa-solid fa-qrcode mr-1"></i>Tra Cứu / Hủy Vé & Đánh Giá
+                    </button>
+                </div>
+                <div class="text-xs text-slate-600 flex items-center gap-3">
+                    <span><i class="fa-solid fa-user-check text-emerald-600 mr-1"></i>Tài khoản: <strong>Nguyễn Minh Khoa</strong></span>
+                    <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold">
+                        <i class="fa-solid fa-coins mr-1"></i><span id="user-points">120</span> điểm thưởng
+                    </span>
+                </div>
+            </div>
+
+            <!-- SUB 1A: TÌM KIẾM CHUYẾN ĐI -->
+            <div id="customer-search-panel" class="space-y-6">
+                <!-- Banner -->
+                <div id="banner-box" class="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white p-5 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <span class="text-xs uppercase font-bold tracking-wider bg-white/20 px-2.5 py-1 rounded-full">DBMS Concurrency Demo</span>
+                        <h2 class="text-xl font-bold mt-2">Đặt vé Xe Khách Limousine & Tàu Hỏa Thống Nhất Thời Gian Thực</h2>
+                        <p class="text-sm text-blue-100 mt-1">Sử dụng <code>SELECT ... FOR UPDATE</code> khóa ghế chống trùng lặp & tự động nhả ghế sau 120 giây.</p>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur p-3 rounded-xl border border-white/20 text-xs space-y-1">
+                        <div>Mã giảm giá sàn: <strong class="text-amber-300 font-mono-code">VEXETAU50</strong> (-50.000đ)</div>
+                        <div>Mã giảm 20%: <strong class="text-amber-300 font-mono-code">DBMS20</strong> (Tối đa 100k)</div>
+                    </div>
+                </div>
+
+                <!-- Form Tìm kiếm -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Điểm đi</label>
+                        <select id="filter-origin" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium">
+                            <option value="">Tất cả điểm đi</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Điểm đến</label>
+                        <select id="filter-dest" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium">
+                            <option value="">Tất cả điểm đến</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Loại phương tiện</label>
+                        <select id="filter-category" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium">
+                            <option value="ALL">Tất cả (Xe & Tàu hỏa)</option>
+                            <option value="BUS">Xe khách / Limousine</option>
+                            <option value="TRAIN">Tàu hỏa đường sắt</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Sắp xếp theo</label>
+                        <select id="filter-sort" class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-medium">
+                            <option value="TIME">Giờ khởi hành sớm nhất</option>
+                            <option value="PRICE_ASC">Giá vé tăng dần</option>
+                            <option value="PRICE_DESC">Giá vé giảm dần</option>
+                            <option value="DURATION">Thời gian di chuyển ngắn nhất</option>
+                        </select>
+                    </div>
+                    <button onclick="loadTrips()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow transition">
+                        <i class="fa-solid fa-search mr-1.5"></i>Tìm Chuyến
+                    </button>
+                </div>
+
+                <!-- Danh sách chuyến đi -->
+                <div id="trips-list" class="space-y-4"></div>
+            </div>
+
+            <!-- SUB 1B: TRA CỨU VÉ, HỦY HOÀN TIỀN & ĐÁNH GIÁ -->
+            <div id="customer-lookup-panel" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Tra Cứu Vé Điện Tử & Hủy Hoàn Tiền Theo Chính Sách DB</h3>
+                    <p class="text-xs text-slate-500 mb-4">Dữ liệu mẫu có sẵn: Mã vé <code class="bg-slate-100 px-1.5 py-0.5 rounded font-bold">VXT-888999</code> — SĐT <code class="bg-slate-100 px-1.5 py-0.5 rounded font-bold">0901234567</code></p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <input id="lookup-code" type="text" value="VXT-888999" placeholder="Nhập mã đặt vé (VD: VXT-888999)" class="border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-mono-code" />
+                        <input id="lookup-phone" type="text" value="0901234567" placeholder="Nhập SĐT đặt vé" class="border border-slate-300 rounded-xl px-4 py-2.5 text-sm" />
+                        <button onclick="lookupTicket()" class="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-5 rounded-xl text-sm">
+                            <i class="fa-solid fa-magnifying-glass mr-1.5"></i>Tra Cứu Đơn Vé
+                        </button>
+                    </div>
+                    <div id="lookup-result" class="mt-6"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- PHÂN HỆ 2: NHÀ XE / ĐƠN VỊ VẬN HÀNH                                   -->
+        <!-- ===================================================================== -->
+        <section id="view-operator" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Soát vé QR lên xe/tàu -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex items-center gap-2 text-blue-700 font-bold">
+                        <i class="fa-solid fa-qrcode text-xl"></i>
+                        <h3>Soát Vé QR Lên Xe / Tàu</h3>
+                    </div>
+                    <p class="text-xs text-slate-500">Gọi trực tiếp <code>CALL sp_OperatorCheckInQR()</code> kiểm tra tính hợp lệ và chống quét trùng vé.</p>
+                    <input id="qr-ticket-input" type="text" value="TK-888999-A01" placeholder="Nhập mã vé hoặc chuỗi QR..." class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-mono-code" />
+                    <button onclick="scanTicketQR()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm shadow">
+                        <i class="fa-solid fa-check-double mr-1.5"></i>Xác Nhận Soát Vé
+                    </button>
+                    <div id="qr-scan-result" class="text-xs"></div>
+                </div>
+
+                <!-- Tạo chuyến mới -->
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                    <div class="flex items-center gap-2 text-slate-800 font-bold">
+                        <i class="fa-solid fa-calendar-plus text-blue-600 text-xl"></i>
+                        <h3>Tạo Lịch Chạy Mới (Tự Động Sinh Sơ Đồ Ghế `trip_seats`)</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <label class="text-xs font-bold text-slate-500">Tuyến đường</label>
+                            <select id="op-route-id" class="w-full border border-slate-300 rounded-xl px-3 py-2 mt-1">
+                                <option value="1">Tuyến #1: TP.HCM → Đà Lạt (Phương Trang)</option>
+                                <option value="3">Tuyến #3: Ga Sài Gòn → Ga Nha Trang (Tàu SE2)</option>
+                                <option value="4">Tuyến #4: Hà Nội → Sa Pa (Sao Việt Limousine)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500">Phương tiện / Đoàn tàu</label>
+                            <select id="op-vehicle-id" class="w-full border border-slate-300 rounded-xl px-3 py-2 mt-1">
+                                <option value="1">51B-298.45 (Limousine 24 Cabin)</option>
+                                <option value="3">TÀU-SE2-VIP (Tàu hỏa 32 Giường VIP)</option>
+                                <option value="4">29B-608.99 (Sao Việt 24 Cabin)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500">Giờ khởi hành</label>
+                            <input id="op-dep-time" type="datetime-local" class="w-full border border-slate-300 rounded-xl px-3 py-2 mt-1" />
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500">Giá vé cơ bản (VNĐ)</label>
+                            <input id="op-price" type="number" value="360000" class="w-full border border-slate-300 rounded-xl px-3 py-2 mt-1" />
+                        </div>
+                    </div>
+                    <button onclick="createNewTrip()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm">
+                        <i class="fa-solid fa-plus mr-1"></i>Phát Hành Chuyến & Sinh Ghế DB
+                    </button>
+                </div>
+            </div>
+
+            <!-- Thống kê doanh thu nhà xe từ SQL View vw_operator_revenue_report -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-3">Báo Cáo Doanh Thu & Hoa Hồng (SQL View: <code>vw_operator_revenue_report</code>)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase">
+                                <th class="p-3 rounded-tl-xl">Đơn vị vận hành</th>
+                                <th class="p-3">Loại hình</th>
+                                <th class="p-3">Số vé bán</th>
+                                <th class="p-3">Doanh thu gộp</th>
+                                <th class="p-3">Hoa hồng sàn</th>
+                                <th class="p-3 rounded-tr-xl">Thực nhận nhà xe</th>
+                            </tr>
+                        </thead>
+                        <tbody id="op-revenue-tbody" class="divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Danh sách hành khách theo chuyến -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-3">Danh Sách Hành Khách & Trạng Thái Soát Vé</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase">
+                                <th class="p-3">Mã vé QR</th>
+                                <th class="p-3">Hành khách</th>
+                                <th class="p-3">Tuyến / Nhà xe</th>
+                                <th class="p-3">Ghế</th>
+                                <th class="p-3">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody id="op-passengers-tbody" class="divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================== -->
+        <!-- PHÂN HỆ 3: QUẢN TRỊ VIÊN (ADMIN) & DBMS MONITOR                       -->
+        <!-- ===================================================================== -->
+        <section id="view-admin" class="hidden space-y-6">
+            <!-- KPI Cards -->
+            <div id="admin-kpi-grid" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
+
+            <!-- Duyệt / Khóa nhà xe & Cấu hình hoa hồng -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-3">Quản Lý & Phê Duyệt Đơn Vị Vận Hành (RBAC)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase">
+                                <th class="p-3">Nhà xe / Đường sắt</th>
+                                <th class="p-3">Mã số thuế</th>
+                                <th class="p-3">Chiết khấu (%)</th>
+                                <th class="p-3">Trạng thái</th>
+                                <th class="p-3">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-operators-tbody" class="divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- MODAL CHỌN GHẾ THỜI GIAN THỰC & THANH TOÁN ACID -->
+    <div id="booking-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
+            <div class="p-5 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+                <div>
+                    <h3 id="modal-trip-title" class="font-extrabold text-lg text-slate-900">Chọn Ghế / Giường Thời Gian Thực</h3>
+                    <p id="modal-trip-subtitle" class="text-xs text-slate-500"></p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="lock-countdown-box" class="hidden bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1.5 rounded-xl text-xs font-bold">
+                        <i class="fa-solid fa-clock mr-1"></i>Giữ chỗ: <span id="lock-timer">02:00</span>
+                    </div>
+                    <button onclick="closeBookingModal()" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Cột trái: Sơ đồ ghế -->
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="flex flex-wrap gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded border-2 border-slate-300 bg-white inline-block"></span> Trống</span>
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-blue-600 inline-block"></span> Bạn đang giữ</span>
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded border-2 border-dashed border-amber-500 bg-amber-100 inline-block"></span> Khách khác đang giữ</span>
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-slate-300 inline-block"></span> Đã bán</span>
+                    </div>
+
+                    <div id="seat-map-container" class="space-y-4"></div>
+                </div>
+
+                <!-- Cột phải: Thông tin hành khách & Thanh toán -->
+                <div class="lg:col-span-5 bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                    <h4 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Thông Tin Hành Khách & Thanh Toán</h4>
+
+                    <div class="text-xs bg-white p-3 rounded-xl border border-slate-200">
+                        <span class="text-slate-500">Ghế đã khóa:</span>
+                        <strong id="selected-seats-display" class="text-blue-700 font-mono-code ml-1">Chưa chọn ghế</strong>
+                    </div>
+
+                    <div class="space-y-2.5 text-sm">
+                        <input id="bk-name" type="text" value="Nguyễn Minh Khoa" placeholder="Họ tên hành khách *" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 bg-white" />
+                        <input id="bk-phone" type="text" value="0901234567" placeholder="Số điện thoại nhận vé *" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 bg-white" />
+                        <input id="bk-email" type="email" value="khoa.nguyen@gmail.com" placeholder="Email nhận vé điện tử QR" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 bg-white" />
+                        <div class="grid grid-cols-2 gap-2">
+                            <input id="bk-pickup" type="text" placeholder="Điểm đón" class="w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-xs" />
+                            <input id="bk-dropoff" type="text" placeholder="Điểm trả" class="w-full border border-slate-300 rounded-xl px-3 py-2 bg-white text-xs" />
+                        </div>
+                    </div>
+
+                    <!-- Mã giảm giá & Điểm thưởng -->
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <input id="bk-promo" type="text" placeholder="Mã giảm giá (VD: VEXETAU50)" class="border border-slate-300 rounded-xl px-3 py-2 bg-white font-mono-code uppercase" />
+                        <select id="bk-payment" class="border border-slate-300 rounded-xl px-3 py-2 bg-white font-semibold">
+                            <option value="VNPAY">Ví VNPay QR</option>
+                            <option value="MOMO">Ví MoMo</option>
+                            <option value="ZALOPAY">ZaloPay</option>
+                            <option value="BANK_QR">Chuyển khoản VietQR</option>
+                            <option value="VISA_MASTER">Thẻ Visa / MasterCard</option>
+                        </select>
+                    </div>
+
+                    <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                        <input id="bk-use-points" type="checkbox" class="rounded" />
+                        <span>Dùng <strong>20 điểm thưởng</strong> (-20.000đ)</span>
+                    </label>
+
+                    <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                        <input id="bk-vat" type="checkbox" onchange="document.getElementById('vat-fields').classList.toggle('hidden')" class="rounded" />
+                        <span>Xuất hóa đơn điện tử (VAT)</span>
+                    </label>
+                    <div id="vat-fields" class="hidden grid grid-cols-2 gap-2 text-xs">
+                        <input id="bk-vat-tax" type="text" placeholder="Mã số thuế" class="border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white" />
+                        <input id="bk-vat-company" type="text" placeholder="Tên công ty" class="border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white" />
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-3 flex items-center justify-between">
+                        <span class="text-xs text-slate-500">Tạm tính (chưa trừ mã):</span>
+                        <strong id="bk-subtotal-text" class="text-lg font-extrabold text-blue-700">0đ</strong>
+                    </div>
+
+                    <button onclick="submitBookingPayment()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition">
+                        <i class="fa-solid fa-shield-halved mr-1.5"></i>Thanh Toán & Xuất Vé QR (ACID)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/assets/js/app.js"></script>
+</body>
+</html>
